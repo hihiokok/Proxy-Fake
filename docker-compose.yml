@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Relational Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: enterprise-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: vps_enterprise
+      POSTGRES_USER: vps_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-EnterprisePgSecure2026!}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/001_initial_schema.sql:ro
+    networks:
+      - enterprise-internal
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vps_admin -d vps_enterprise"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Redis In-Memory Cache & Session Store
+  redis:
+    image: redis:7-alpine
+    container_name: enterprise-redis
+    restart: always
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-EnterpriseRedisAuth2026!}"
+    volumes:
+      - redisdata:/data
+    networks:
+      - enterprise-internal
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # 3. Enterprise Control Center & API Backend
+  control-center:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: enterprise-control-center
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: vps_enterprise
+      POSTGRES_USER: vps_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-EnterprisePgSecure2026!}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-EnterpriseRedisAuth2026!}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-EnterpriseMasterVaultKey2026!}
+    volumes:
+      - vps_sandbox:/opt/vps/sandbox
+      - vps_ca_vault:/opt/vps/ca-vault
+      - vps_backups:/opt/vps/backups
+    ports:
+      - "3000:3000"
+      - "8080:8080"
+      - "8443:8443"
+    networks:
+      - enterprise-internal
+      - enterprise-public
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  enterprise-internal:
+    driver: bridge
+    internal: true
+  enterprise-public:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
+  vps_sandbox:
+  vps_ca_vault:
+  vps_backups:

@@ -1,0 +1,8 @@
+{
+  "name": "Enterprise VPS & Proxy Control Center",
+  "description": "Enterprise-grade 24/7 VPS, Proxy Gateway, Internal 50-Year CA, Process Supervisor and Monitoring System.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
